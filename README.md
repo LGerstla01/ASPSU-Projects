@@ -1,2 +1,2 @@
 # ASPSU-Projects
-Autonomous Systems: Perception and Situationunderstanding
+Autonomous Systems: Perception and Situation Understanding
