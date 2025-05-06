@@ -17,8 +17,10 @@ def project_points(p, f):
                       [0, 0, 1, 0]])
 
     p_proj = np.dot(f_mat, p)
+    
+    p_image = [int(p_proj[0] / p_proj[2]), int(p_proj[1] / p_proj[2])]
 
-    return p_proj[:2]
+    return p_image
 
 def main():
     # Example focal length
