@@ -14,7 +14,7 @@ class EKFTracker(Node):
         super().__init__('ekf_tracker')
 
         # Parameter einlesen
-        self.declare_parameter('num_robots', 3)
+        self.declare_parameter('num_robots', 2)
         self.declare_parameter('num_cameras', 2)
         self.num_robots = self.get_parameter('num_robots').get_parameter_value().integer_value
         self.num_cameras = self.get_parameter('num_cameras').get_parameter_value().integer_value
@@ -24,7 +24,7 @@ class EKFTracker(Node):
         self.last_update_time = [self.get_clock().now() for _ in range(self.num_robots)]
 
         # Publisher für Pose-Schätzungen
-        #self.estimates_pub = self.create_publisher(PoseArray, '/robot_estimates', 10)
+        self.estimates_pub = self.create_publisher(PoseArray, '/robot_estimates', 10)
         
         self.state_pub = self.create_publisher(RobotStateArray, '/robot_states', 10)
 
