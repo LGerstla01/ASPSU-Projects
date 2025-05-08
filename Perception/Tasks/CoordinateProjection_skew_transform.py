@@ -54,20 +54,24 @@ def main():
     f = 50
 
     # Example 3D point in the world coordinate system
-    p = np.array([38.933, -0.294, 0.583])  # Homogeneous coordinates
+    p = np.array([[38.933], [-0.294], [0.583]])  # Homogeneous coordinates
     p = world_to_camera_coordinates(p)
     p = np.append(p, 1)  # Add homogeneous coordinate
 
-    K = np.array([[1606.6,    0,   672.3], 
+    K = np.array([[1606.6,    0,   672.3,], 
                   [0,      1600.3, 331.5],
-                  [0,         0,     1.0]])
+                  [0,         0,     1.0],
+                  [0,         0,     0]])
     
     t = np.array([[1.77],
                   [0.15],
-                  [-0.6]])
+                  [-0.6],
+                  [1]])  # Homogeneous coordinates
+    
+    t = world_to_camera_coordinates(t)
 
-    R = np.array([[0.99927809, 0, 0.03799086],
-                  [0, 1, 0],
+    R = np.array([[0.99927809,  0, 0.03799086],
+                  [0,           1, 0],
                   [-0.03799086, 0, 0.99927809]])
     
     # Combine R and t into a 3x4 matrix

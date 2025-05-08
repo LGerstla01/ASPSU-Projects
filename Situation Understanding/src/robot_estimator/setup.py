@@ -25,7 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             'robotControllerNode = robot_estimator.robotControllerNode:main',
-            'state_estimator = robot_estimator.state_estimator:main',
+            'ekfNode = robot_estimator.ekfNode:main',
             'VisualizationNode = robot_estimator.visualizationNode:main',
             'cameraDetectionNode = robot_estimator.cameraDetectionNode:main',
         ],

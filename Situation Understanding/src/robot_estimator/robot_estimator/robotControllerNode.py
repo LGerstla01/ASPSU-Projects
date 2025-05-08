@@ -16,6 +16,7 @@ class RobotControllerNode(Node):
 
         self.robot_pub = self.create_publisher(PoseArray, '/robots/pose', 10)
         self.create_timer(0.1, self.update_positions)
+        self.create_timer(3.0, self.change_directions)  # Timer to change directions every 3 seconds
 
         # Initialize robot positions and directions
         self.robots = []
@@ -61,6 +62,11 @@ class RobotControllerNode(Node):
 
         # Publish updated positions
         self.robot_pub.publish(pose_array)
+
+    def change_directions(self):
+        for robot in self.robots:
+            robot['angle'] = random.uniform(0, 2 * math.pi)  # Assign a new random direction
+        self.get_logger().info("Robot directions updated.")
 
 def main(args=None):
     rclpy.init(args=args)
