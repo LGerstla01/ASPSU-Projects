@@ -55,7 +55,6 @@ def main():
     p_img = project_points(p_cam, K)
     print("Projected Points:\n", p_img)
 
-    # Verify projection (replace 'image_path' with the actual path to your image)
     image_path = f"C:\\Users\\lukas\\Dokumente\\Studium\\Master\\2. Semester\\Fächer\\Autonomous Systems Perception and Situation Understanding\\ASPSU-Projects\\Perception\\Tasks\\Images\\test_image.png"
     verify_projection(image_path, p_img)
 

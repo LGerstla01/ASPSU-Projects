@@ -9,6 +9,7 @@ Demo of point projection from 3D space to 2D using camera intrinsic matrix.
 from typing import List, Type
 import numpy as np
 import cv2
+import matplotlib.pyplot as plt
 
 __author__ = 'Nico Hessenthaler'
 __copyright__ = 'Copyright 2025, HHN - Autonomous Systems: Perception and Situation Understanding'
@@ -80,8 +81,10 @@ if __name__=="__main__":
     p_img = project_point(p_cam)
 
     # Read the image
+    image_path = f"C:\\Users\\lukas\\Dokumente\\Studium\\Master\\2. Semester\\Fächer\\Autonomous Systems Perception and Situation Understanding\\ASPSU-Projects\\Perception\\Tasks\\Images\\test_image.png"
+    
     image = \
-        cv2.imread(f"C:\\Users\\lukas\\Dokumente\\Studium\\Master\\2. Semester\\Fächer\\Autonomous Systems Perception and Situation Understanding\\ASPSU-Projects\\Perception\\Tasks\\Images\\test_image.png")
+        plt.imread(image_path)
 
     # Visualize the point in the image
     print(p_img)

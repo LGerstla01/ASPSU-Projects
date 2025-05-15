@@ -13,25 +13,25 @@ def world_to_camera_coordinates(p):
     """
     return np.array([-p[1], -p[2], p[0]])
 
-def project_points(p, M):
+def project_points(p, K):
     """
-    Projects a 3D point in the world coordinate system to the image sensor coordinate system.
+    Projects a 3D point in the camera coordinate system to the image sensor coordinate system.
 
     Args:
-        p (numpy.ndarray): 3D point in the world coordinate system (homogeneous coordinates).
-        M (numpy.ndarray): Full camera projection matrix.
+        p_cam (numpy.ndarray): 3D point in the camera coordinate system.
+        K (numpy.ndarray): Intrinsic camera matrix.
 
     Returns:
         numpy.ndarray: 2D image coordinates of the projected points.
     """
     # Perform the projection
-    p_projected = np.dot(M, p)
+    p_projected = np.dot(K, p)
 
     # Divide by the homogeneous coordinate
-    u = p_projected[0] / p_projected[2]
-    v = p_projected[1] / p_projected[2]
+    u = int(p_projected[0, 0] / p_projected[2, 0])  # Extract scalar value
+    v = int(p_projected[1, 0] / p_projected[2, 0])  # Extract scalar value
 
-    return [int(u), int(v)]
+    return [u, v]
 
 def verify_projection(image_path, p_img):
     """
@@ -54,37 +54,33 @@ def main():
     f = 50
 
     # Example 3D point in the world coordinate system
-    p = np.array([[38.933], [-0.294], [0.583]])  # Homogeneous coordinates
-    p = world_to_camera_coordinates(p)
-    p = np.append(p, 1)  # Add homogeneous coordinate
-
+    p_w = np.array([[38.933], 
+                  [-0.294], 
+                  [0.583],
+                  [1]])  # Homogeneous coordinates
+        
     K = np.array([[1606.6,    0,   672.3,], 
                   [0,      1600.3, 331.5],
-                  [0,         0,     1.0],
-                  [0,         0,     0]])
+                  [0,         0,     1.0]])
     
-    t = np.array([[1.77],
+    t_wc = np.array([[1.77],
                   [0.15],
                   [-0.6],
-                  [1]])  # Homogeneous coordinates
+                  [1]])  # Translation vector from world to camera coordinates
     
-    t = world_to_camera_coordinates(t)
-
-    R = np.array([[0.99927809,  0, 0.03799086],
-                  [0,           1, 0],
-                  [-0.03799086, 0, 0.99927809]])
+    R_wc = np.array([[0.99927809,  0, 0.03799086],
+                  [0,              1, 0],
+                  [-0.03799086,    0, 0.99927809],
+                  [0,              0, 0]])  # Rotation matrix from world to camera coordinates
     
-    # Combine R and t into a 3x4 matrix
-    Rt = np.hstack((R, t))
+    Rt_wc = np.hstack((R_wc, t_wc))  # Combine rotation and translation into a single matrix
+    p_c = np.dot(Rt_wc, p_w)  # Transform the point to camera coordinates
+    p_c = world_to_camera_coordinates(p_c)
 
-    # Compute the full camera projection matrix
-    M = np.matmul(K, Rt)
 
-    # Project points using the full projection matrix
-    p_img = project_points(p, M)
-    print("Projected Points:\n", p_img)
+    p_img = project_points(p_c, K)
+    print("Projected Point:\n", p_img)
 
-    # Verify projection (replace 'image_path' with the actual path to your image)
     image_path = f"C:\\Users\\lukas\\Dokumente\\Studium\\Master\\2. Semester\\Fächer\\Autonomous Systems Perception and Situation Understanding\\ASPSU-Projects\\Perception\\Tasks\\Images\\test_image.png"
     verify_projection(image_path, p_img)
 
