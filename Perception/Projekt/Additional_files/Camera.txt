@@ -1,0 +1,24 @@
+################################################################################################
+#              		Stereo camera params (rectified virtual cameras)
+#
+################################################################################################
+
+[INTERNAL]
+F        = 820.428   	# [pixel] Focal length.
+SX       = 1.0		# [pixel] Pixel size in X direction of the image.
+SY       = 1.000283	# [pixel] Pixel size in Y direction of the image.
+X0       = 305.278	# [pixel] X-coordinate of principle (from top-left origin of the image).
+Y0       = 239.826	# [pixel] Y-coordinate of principle (from top-left origin of the image).
+
+[EXTERNAL]
+B        = 0.308084	# [m] Width of the baseline of the stereo camera rig.
+LATPOS   = -0.07	# [m] Lateral position of rectified images, giving origin of camera coordinate system. Described in world coordinate system already!
+HEIGHT   = 1.26		# [m] Altitudinal position of rectified images, giving origin of camera coordinate system. Described in world coordinate system already!
+DISTANCE = 2.0		# [m] Longitudinal position of rectified images, giving origin of camera coordinate system. Described in world coordinate system already!
+TILT     = 0.06 	# [rad] Tilt angle of the cameras.
+YAW      = 0.01	        # [rad] Yaw angle of the cameras.
+ROLL     = 0.0		# [rad] Roll angle of the cameras.
+
+# Note:
+#  In a stereo camera system the internal parameters for both cameras are the
+#  same.
