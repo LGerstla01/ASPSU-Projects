@@ -13,24 +13,30 @@ class VisualizationNode(Node):
         super().__init__('visualizer')
         self.declare_parameter('num_robots', 1)
         self.declare_parameter('num_cameras', 2)
-        self.declare_parameter('FOV', 60.0)  # Field of view in degrees
+        self.declare_parameter('FOV', 50.0)  # Field of view in degrees
+        self.declare_parameter('num_lidar', 1)  # Field of view in degrees
+        self.declare_parameter('angle_lidar', 20)
         self.declare_parameter('room_size', [40.0, 30.0, 3.0])  # [width, height]
 
         self.num_robots = self.get_parameter('num_robots').value
         self.num_cameras = self.get_parameter('num_cameras').value
         self.room_size = self.get_parameter('room_size').value
+        self.num_lidar = self.get_parameter('num_lidar').value
+        self.angle_lidar = self.get_parameter('angle_lidar').value
         self.FOV = np.radians(self.get_parameter('FOV').value)  # Convert to radians
 
         self.robot_sub = self.create_subscription(PoseArray, '/robots/pose', self.robot_callback, 10)
 
-        self.robot_sub = self.create_subscription(PoseArray, '/camera_2/detections', self.robot_estimation_callback, 10)
+        self.robot_camera_sub = self.create_subscription(PoseArray, '/detections/camera_1', self.robot_camera_callback, 10)
 
+        #self.robot_lidar_sub = self.create_subscription(PoseArray, '/detections/lidar_1', self.robot_lidar_callback, 10)
 
 
         # Example: Add subscriptions or other ROS2 functionality here
         self.room_pub = self.create_publisher(MarkerArray, '/visualize/room', 10)
         self.robot_pub = self.create_publisher(MarkerArray, '/visualize/robots', 10)
         self.robot_estimated_pub = self.create_publisher(MarkerArray, '/visualize/robots_estimated', 10)
+        self.robots_lidar_pub = self.create_publisher(MarkerArray, '/visualize/lidar', 10)
 
         self.create_timer(1.0, self.publish_room_markers)
         #self.pub_robots(rand=True)
@@ -38,7 +44,7 @@ class VisualizationNode(Node):
     def robot_callback(self, msg, estimation=False):
         self.pub_robots(pos=msg)
 
-    def robot_estimation_callback(self, msg, estimation=True):
+    def robot_camera_callback(self, msg, estimation=True):
         self.pub_estimated_robots(pos=msg)
 
     def publish_room_markers(self):
@@ -127,8 +133,33 @@ class VisualizationNode(Node):
             marker_triangle.color.r = 0.0
             marker_triangle.color.g = 1.0
             marker_triangle.color.b = 0.0
-            marker_triangle.color.a = 0.5
+            marker_triangle.color.a = 0.3
             marker_array.markers.append(marker_triangle)
+
+        # Lidar
+        lidar_positions = [
+            (0.0, -self.room_size[1] / 2 ,1.0),
+            (0.0, self.room_size[1] / 2 ,1.0),
+            ]
+        
+        for i in range(self.num_lidar):
+            marker = Marker()
+            marker.header.frame_id = "map"
+            marker.type = Marker.LINE_LIST
+            marker.action = Marker.ADD
+            marker.id = len(marker_array.markers) + 1
+            marker.ns = "lidar"
+            marker.points = self.points_lidar(i, lidar_positions[i], self.angle_lidar)
+            marker.scale.x = 0.2
+            marker.color.r = 0.0
+            marker.color.g = 0.0
+            marker.color.b = 1.0
+            marker.color.a = 1.0
+            #marker.pose.position.x = 0
+            #marker.pose.position.y = 0
+            #marker.pose.position.z = 1
+            marker_array.markers.append(marker)
+
 
         self.room_pub.publish(marker_array)
 
@@ -193,12 +224,33 @@ class VisualizationNode(Node):
         if len(marker_array.markers) > 0:
             self.robot_estimated_pub.publish(marker_array)
 
-        
+    def robot_lidar_callback(self, msg):
+        marker_array = MarkerArray()
+        for i in range(len(msg.poses)):
+            if msg.poses[i].position.x < 9999:
+                marker = Marker()
+                marker.type = Marker.SPHERE
+                marker.action = Marker.ADD
+                marker.id = i
+                marker.scale.x = 1.0
+                marker.scale.y = 0.5
+                marker.scale.z = 0.5
+
+                marker.ns = "robot_lidar"
+                marker.color.r = 0.0
+                marker.color.g = 1.0
+                marker.color.b = 1.0
+                marker.color.a = 1.0
+                marker.header = msg.header
+                marker.pose.position = msg.poses[i].position
+
+                marker_array.markers.append(marker)
+
+        if len(marker_array.markers) > 0:
+            self.robots_lidar_pub.publish(marker_array)
 
     def points_triangle(self, i, camera_pos):
-        #camera_angle = np.radians(180) + self.normalize_angle(np.arctan2(camera_pos.y, camera_pos.x) + np.pi)
-        #camera_angle = np.radians(225)
-        
+        points = []
         if i == 0:
             camera_angle = np.radians(225)
         elif i == 1:
@@ -212,18 +264,63 @@ class VisualizationNode(Node):
         point1.x = camera_pos.x
         point1.y = camera_pos.y
         point1.z = camera_pos.z
+        points.append(point1)
+
+        länge1 = np.abs((self.room_size[0]) / np.sin(camera_angle + self.FOV / 2))
+        länge2 = np.abs((self.room_size[1]) / np.cos(camera_angle + self.FOV / 2))
+        länge = länge1 if länge1 < länge2 else länge2
 
         point2 = Point()
-        point2.x = camera_pos.x + self.room_size[0] * np.sin(camera_angle + self.FOV / 2)
-        point2.y = camera_pos.y + self.room_size[0] * np.cos(camera_angle + self.FOV / 2)
+        point2.x = camera_pos.x + länge * np.sin(camera_angle + self.FOV / 2)
+        point2.y = camera_pos.y + länge * np.cos(camera_angle + self.FOV / 2)
         point2.z = camera_pos.z
+        points.append(point2)
+
+        länge1 = np.abs((self.room_size[0]) / np.sin(camera_angle - self.FOV / 2))
+        länge2 = np.abs((self.room_size[1]) / np.cos(camera_angle - self.FOV / 2))
+        länge = länge1 if länge1 < länge2 else länge2
 
         point3 = Point()
-        point3.x = camera_pos.x + self.room_size[0] * np.sin(camera_angle - self.FOV / 2)
-        point3.y = camera_pos.y + self.room_size[0] * np.cos(camera_angle - self.FOV / 2)
+        point3.x = -camera_pos.x
+        point3.y = -camera_pos.y
         point3.z = camera_pos.z
+        
+
+        point4 = Point()
+        point4.x = camera_pos.x + länge * np.sin(camera_angle - self.FOV / 2)
+        point4.y = camera_pos.y + länge * np.cos(camera_angle - self.FOV / 2)
+        point4.z = camera_pos.z
+        points.append(point4)
+        points.append(point2)
+        points.append(point3)
+        points.append(point4)
     
-        return point1, point2, point3
+        return points
+    
+    def points_lidar(self, num, start, angle):
+
+        points = []
+        for i in range(int(180 / angle)-1):
+            i += 1
+            if num == 1:
+                i = i + int(180 / angle)
+            angle_rad = np.radians(angle) * i
+            start_point = Point()
+            start_point.x = start[0]
+            start_point.y = start[1]
+            start_point.z = start[2]
+            points.append(start_point)
+
+            länge = np.abs((self.room_size[0]/2) / np.cos(angle_rad))
+            if länge > np.sqrt((self.room_size[0]/2)*(self.room_size[0]/2) + self.room_size[1]*self.room_size[1]):
+                länge = np.abs((self.room_size[1]) / np.sin(angle_rad))
+
+            end = Point()
+            end.x = start_point.x + länge * np.cos(angle_rad)
+            end.y = start_point.y + länge * np.sin(angle_rad)
+            end.z = start[2]  
+            points.append(end)
+        return points
 
     def normalize_angle(self, angle):
         # Normalize the angle to be within -pi to pi

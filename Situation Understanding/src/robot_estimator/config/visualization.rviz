@@ -56,9 +56,8 @@ Visualization Manager:
       Enabled: true
       Name: Room
       Namespaces:
-        FOV: true
-        camera: true
         floor: true
+        lidar: true
         wall: true
       Topic:
         Depth: 5
@@ -83,13 +82,25 @@ Visualization Manager:
       Enabled: true
       Name: Robots estimated
       Namespaces:
-        robot_estimated: true
+        {}
       Topic:
         Depth: 5
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /visualize/robots_estimated
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
+      Enabled: true
+      Name: RobotLidar
+      Namespaces:
+        robot_lidar: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /visualize/lidar
       Value: true
   Enabled: true
   Global Options:

@@ -3,7 +3,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 import random
 import math
-from tf_transformations import quaternion_from_euler
+from scipy.spatial.transform import Rotation as R
 
 class RobotControllerNode(Node):
     def __init__(self):
@@ -32,9 +32,12 @@ class RobotControllerNode(Node):
         pose_array.header.stamp = self.get_clock().now().to_msg()
 
         for robot in self.robots:
+            # Zufällige Richtungsänderung
+            robot['angle'] += random.uniform(-0.2, 0.2)  # Kleine zufällige Änderung pro Schritt
+
             # Update position
-            robot['x'] += math.cos(robot['angle']) * 0.5  # Move forward (0.5 units per step)
-            robot['y'] += math.sin(robot['angle']) * 0.5
+            robot['x'] += math.cos(robot['angle']) * 0.3  # Move forward (0.5 units per step)
+            robot['y'] += math.sin(robot['angle']) * 0.3
 
             # Check for collisions with walls and bounce
             if robot['x'] <= -self.room_size[0] / 2 or robot['x'] >= self.room_size[0] / 2:
@@ -52,7 +55,7 @@ class RobotControllerNode(Node):
             pose.position.z = 0.0
 
             # Calculate orientation from angle
-            quaternion = quaternion_from_euler(0, 0, robot['angle'])
+            quaternion = R.from_euler('z', robot['angle']).as_quat()  # [x, y, z, w]
             pose.orientation.x = quaternion[0]
             pose.orientation.y = quaternion[1]
             pose.orientation.z = quaternion[2]

@@ -28,6 +28,7 @@ setup(
             'ekfNode = robot_estimator.ekfNode:main',
             'VisualizationNode = robot_estimator.visualizationNode:main',
             'cameraDetectionNode = robot_estimator.cameraDetectionNode:main',
+            'lidarDetectionNode = robot_estimator.lidarDetectionNode:main',
         ],
     },
 )

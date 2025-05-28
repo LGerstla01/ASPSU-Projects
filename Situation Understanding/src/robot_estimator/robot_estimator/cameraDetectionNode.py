@@ -17,9 +17,12 @@ class CameraDetectionNode(Node):
         self.camera_fov = np.radians(self.get_parameter('camera_fov').value)  # Convert to radians
         self.noise = self.get_parameter('noise').value
 
-        self.robot_sub = self.create_subscription(PoseArray, '/robots/pose', self.robot_callback, 10)
+        self.robot_sub = self.create_subscription(PoseArray, '/robots/pose', self.pos_callback, 10)
         self.camera_positions = self.initialize_camera_positions()
         self.camera_publishers = self.initialize_camera_publishers()
+
+        self.create_timer(0.1, self.robot_callback)  # Timer to publish dummy data
+        self.msg = PoseArray()
 
     def initialize_camera_positions(self):
         # Define camera positions in the corners of the room
@@ -34,27 +37,26 @@ class CameraDetectionNode(Node):
     def initialize_camera_publishers(self):
         publishers = []
         for i in range(self.num_cameras):
-            topic_name = f'/camera_{i+1}/detections'
+            topic_name = f'/detections/camera_{i+1}'
             publishers.append(self.create_publisher(PoseArray, topic_name, 10))
         return publishers
+    
+    def pos_callback(self, msg):
+        self.msg = msg
 
-    def robot_callback(self, msg):
+    def robot_callback(self):
         detections_per_camera = [PoseArray() for _ in range(self.num_cameras)]
         for i, detections in enumerate(detections_per_camera):
             detections.header = Header()
             detections.header.stamp = self.get_clock().now().to_msg()
             detections.header.frame_id = "map"
 
-        for robot_pose in msg.poses:
+        for robot_pose in self.msg.poses:
             for i, camera_pos in enumerate(self.camera_positions):
                 if self.is_in_fov(camera_pos, i, robot_pose):
                     noisy_pose = self.add_noise(robot_pose)
                     detections_per_camera[i].poses.append(noisy_pose)
-                else:
-                    dummy_pose = Pose()
-                    dummy_pose.position.x = 999999.0
-                    detections_per_camera[i].poses.append(dummy_pose)
-
+                
         for i, detections in enumerate(detections_per_camera):
             if detections.poses:
                 self.camera_publishers[i].publish(detections)

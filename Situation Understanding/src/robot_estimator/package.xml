@@ -7,10 +7,16 @@
   <maintainer email="lgerstla@stud.hs-heilbronn.de">lukas</maintainer>
   <license>Apache-2.0</license>
 
-  <test_depend>ament_copyright</test_depend>
-  <test_depend>ament_flake8</test_depend>
-  <test_depend>ament_pep257</test_depend>
-  <test_depend>python3-pytest</test_depend>
+  <depend>rclcpp</depend>
+  <depend>rclcpp_components</depend>
+  <depend>std_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>launch</depend>
+  <depend>launch_ros</depend>
+  <depend>ament_index_python</depend>
+  <exec_depend>robot_msgs</exec_depend>
+
+
 
   <export>
     <build_type>ament_python</build_type>
