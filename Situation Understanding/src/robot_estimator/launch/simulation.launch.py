@@ -5,6 +5,7 @@ from launch.substitutions import LaunchConfiguration
 import os
 from ament_index_python.packages import get_package_share_directory
 
+# Declare Launch Arguments at the top for clarity
 rviz_config_path = LaunchConfiguration('rviz_config')
 num_robots = LaunchConfiguration('num_robots')
 num_cameras = LaunchConfiguration('num_cameras')
@@ -13,8 +14,13 @@ FOV = LaunchConfiguration('FOV')
 num_lidar = LaunchConfiguration('num_lidar')
 
 def generate_launch_description():
+    pkg_name = 'robot_estimator' # Stellen Sie sicher, dass dies Ihr Paketname ist
+
+    # Pfad zum Paket-Share-Verzeichnis (falls für Konfigurationsdateien benötigt)
+    pkg_share_dir = get_package_share_directory(pkg_name)
+
     return LaunchDescription([
-        # Start the visualizer node
+        # Declare Launch Arguments
         DeclareLaunchArgument(
             'rviz_config',
             default_value=os.path.join(
@@ -54,6 +60,7 @@ def generate_launch_description():
             description='Field of view of the cameras'
         ),
         
+        # Define and launch your nodes
         Node(
             package='robot_estimator',
             executable='VisualizationNode',
@@ -111,5 +118,13 @@ def generate_launch_description():
             output='screen',
             arguments=['-d', rviz_config_path],
         ),
-    ])
 
+        Node(
+            package='robot_estimator',
+            executable='ekf', 
+            name='ekf_tracker',
+            output='screen',
+            # Wenn Sie Debug-Meldungen vom EKF sehen möchten, können Sie die folgende Zeile einkommentieren:
+            arguments=['--ros-args', '--log-level', 'ekf_tracker:=debug'],
+        ),
+    ])

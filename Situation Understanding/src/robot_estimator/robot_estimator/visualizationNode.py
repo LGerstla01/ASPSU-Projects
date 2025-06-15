@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from visualization_msgs.msg import Marker, MarkerArray
 from geometry_msgs.msg import PoseArray, Point
+from nav_msgs.msg import Odometry # NEU: Import für Odometrie-Nachrichten
 import random
 
 class VisualizationNode(Node):
@@ -27,9 +28,10 @@ class VisualizationNode(Node):
 
         self.robot_sub = self.create_subscription(PoseArray, '/robots/pose', self.robot_callback, 10)
 
-        self.robot_camera_sub = self.create_subscription(PoseArray, '/detections/camera_1', self.robot_camera_callback, 10)
+        # DEAKTIVIERT: Die alte Kameradetektions-Visualisierung, die rote Punkte erzeugt hat
+        # self.robot_camera_sub = self.create_subscription(PoseArray, '/detections/camera_1', self.robot_camera_callback, 10)
 
-        #self.robot_lidar_sub = self.create_subscription(PoseArray, '/detections/lidar_1', self.robot_lidar_callback, 10)
+        # self.robot_lidar_sub = self.create_subscription(PoseArray, '/detections/lidar_1', self.robot_lidar_callback, 10)
 
 
         # Example: Add subscriptions or other ROS2 functionality here
@@ -37,6 +39,17 @@ class VisualizationNode(Node):
         self.robot_pub = self.create_publisher(MarkerArray, '/visualize/robots', 10)
         self.robot_estimated_pub = self.create_publisher(MarkerArray, '/visualize/robots_estimated', 10)
         self.robots_lidar_pub = self.create_publisher(MarkerArray, '/visualize/lidar', 10)
+
+        # NEU: Publisher für EKF-Tracks
+        self.ekf_pub = self.create_publisher(MarkerArray, '/visualize/ekf_tracks', 10)
+        self.ekf_data = {} # Speichert die letzten EKF-Posen für jeden Roboter
+
+        # NEU: Abonnements für EKF-Odometrie-Topics
+        # Annahme: Der EKF veröffentlicht auf /ekf/robot_0/odom, /ekf/robot_1/odom, etc.
+        # Und die child_frame_id der Odometrie-Nachricht ist 'robot_0', 'robot_1', etc.
+        self.ekf_sub_0 = self.create_subscription(Odometry, '/ekf/robot_0/odom', self.ekf_callback, 10)
+        self.ekf_sub_1 = self.create_subscription(Odometry, '/ekf/robot_1/odom', self.ekf_callback, 10)
+
 
         self.create_timer(1.0, self.publish_room_markers)
         #self.pub_robots(rand=True)
@@ -46,6 +59,48 @@ class VisualizationNode(Node):
 
     def robot_camera_callback(self, msg, estimation=True):
         self.pub_estimated_robots(pos=msg)
+
+    # NEU: Callback-Funktion für EKF-Odometrie-Nachrichten
+    def ekf_callback(self, msg):
+        # Korrigiert: Versuchen, die Roboter-ID aus der child_frame_id zu extrahieren (z.B. 'robot_0/base_link' -> 0)
+        # Zuerst den Teil vor dem '/' nehmen, dann am '_' splitten
+        parts = msg.child_frame_id.split('/')
+        if len(parts) > 0 and parts[0].startswith('robot_'):
+            try:
+                robot_id_str = parts[0].split('_')[1]
+                robot_id = int(robot_id_str)
+                self.ekf_data[robot_id] = msg.pose.pose # Speichern der Pose (enthält Position und Orientierung)
+                self.publish_ekf_markers() # Marker aktualisieren und veröffentlichen
+            except (IndexError, ValueError):
+                self.get_logger().warn(f"Could not parse robot_id from child_frame_id: {msg.child_frame_id}")
+        else:
+            self.get_logger().warn(f"Unexpected child_frame_id format for EKF: {msg.child_frame_id}")
+
+
+    # NEU: Funktion zum Veröffentlichen der EKF-Marker
+    def publish_ekf_markers(self):
+        marker_array = MarkerArray()
+        for robot_id, pose in self.ekf_data.items():
+            marker = Marker()
+            marker.header.frame_id = "map"  # Annahme: EKF-Posen sind im "map"-Frame
+            marker.header.stamp = self.get_clock().now().to_msg()
+            marker.type = Marker.SPHERE  # Visualisiere als Kugel (Punkt)
+            marker.action = Marker.ADD
+            marker.ns = "ekf_tracked_robots" # Namespace für diese Marker
+            marker.id = robot_id  # Eindeutige ID für jeden Roboter-Marker
+            marker.scale.x = 0.5  # Größe der Kugel
+            marker.scale.y = 0.5
+            marker.scale.z = 0.5
+            marker.color.r = 1.0  # Rot
+            marker.color.g = 0.0
+            marker.color.b = 0.0
+            marker.color.a = 1.0  # Volle Deckkraft
+            marker.pose = pose    # Die geschätzte Pose des Roboters
+
+            marker_array.markers.append(marker)
+
+        if len(marker_array.markers) > 0:
+            self.ekf_pub.publish(marker_array)
 
     def publish_room_markers(self):
         marker_array = MarkerArray()
@@ -258,7 +313,7 @@ class VisualizationNode(Node):
         elif i == 2:
             camera_angle = np.radians(45)
         elif i == 3:
-            camera_angle = np.radians(315)
+            camera_angle = np.radians(135)
 
         point1 = Point()
         point1.x = camera_pos.x

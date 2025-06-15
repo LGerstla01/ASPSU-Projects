@@ -11,6 +11,7 @@ Panels:
         - /Room1/Topic1
         - /Room1/Namespaces1
         - /Robots1
+        - /EKF Tracked Robots1 # NEU: Eintrag für EKF-Roboter
       Splitter Ratio: 0.5
     Tree Height: 746
   - Class: rviz_common/Selection
@@ -82,7 +83,7 @@ Visualization Manager:
       Enabled: true
       Name: Robots estimated
       Namespaces:
-        {}
+        {} # Hier wurden zuvor die roten Punkte der Kameradetektionen angezeigt
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -101,6 +102,18 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /visualize/lidar
+      Value: true
+    # NEU: Display für die EKF-Tracks
+    - Class: rviz_default_plugins/MarkerArray
+      Alpha: 1
+      Autocompute Decay Time: true # Hilft, alte Marker zu entfernen
+      Decay Time: 5 # Marker bleiben 5 Sekunden sichtbar (für kurze Spuren)
+      Enabled: true
+      Flat Color: false
+      Message Type: visualization_msgs/msg/MarkerArray
+      Name: EKF Tracked Robots # Name, der in RViz angezeigt wird
+      Queue Size: 100
+      Topic: /visualize/ekf_tracks # Topic, den unser VisualizationNode jetzt veröffentlicht
       Value: true
   Enabled: true
   Global Options:
