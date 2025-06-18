@@ -124,6 +124,9 @@ def generate_launch_description():
             executable='ekf', 
             name='ekf_tracker',
             output='screen',
+            parameters=[
+                {'room_size': room_size},
+            ],
             # Wenn Sie Debug-Meldungen vom EKF sehen möchten, können Sie die folgende Zeile einkommentieren:
             arguments=['--ros-args', '--log-level', 'ekf_tracker:=debug'],
         ),
