@@ -1,29 +1,18 @@
-# ekf.py
+# ekf.py – Verbesserter EKF mit Raumbegrenzung und Reflexion an Wänden
+
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 from nav_msgs.msg import Odometry
-from robot_msgs.msg import LidarArray  # Custom message
+from robot_msgs.msg import LidarArray
 from visualization_msgs.msg import Marker
 from std_msgs.msg import ColorRGBA
 
 import numpy as np
 import math
 from scipy.spatial.transform import Rotation as R
-from scipy.stats import chi2
-from scipy.optimize import linear_sum_assignment
 import threading
-
-TRACK_COLORS = [
-    ColorRGBA(r=1.0, g=0.0, b=0.0, a=0.5),
-    ColorRGBA(r=0.0, g=1.0, b=0.0, a=0.5),
-    ColorRGBA(r=0.0, g=0.0, b=1.0, a=0.5),
-    ColorRGBA(r=1.0, g=1.0, b=0.0, a=0.5),
-    ColorRGBA(r=0.0, g=1.0, b=1.0, a=0.5),
-]
-
-GATE_THRESHOLD = chi2.ppf(0.99, df=2)  # ≈ 9.21 für 99% Konfidenzintervall
-
+from scipy.optimize import linear_sum_assignment
 
 class SingleEKF:
     def __init__(self, initial_pose: Pose, node: Node, track_id: int):
@@ -37,18 +26,20 @@ class SingleEKF:
         self.x = np.array([initial_pose.position.x, initial_pose.position.y, initial_yaw, 0.0, 0.0])
         self.P = np.eye(5) * 1.0
 
-        self.R = np.diag([0.1, 0.1])
-        self.Q = np.diag([0.05, 0.05, 0.01, 0.1, 0.1])
+        self.Q = np.diag([0.05, 0.05, 0.02, 0.2, 0.2])
 
         self.last_time = self.node.get_clock().now()
 
         self.publisher = self.node.create_publisher(Odometry, f'/ekf/robot_{self.track_id}/odom', 10)
         self.marker_pub = self.node.create_publisher(Marker, f'/ekf/robot_{self.track_id}/cov_ellipse', 10)
 
-        self.missed_updates = 0
-        self.max_missed_updates = 9999  # sehr hoch, damit nie automatisch gelöscht
+        # Raumbegrenzung
+        self.x_min = -20.0
+        self.x_max = 20.0
+        self.y_min = -15.0
+        self.y_max = 15.0
 
-        self.node.get_logger().info(f'Initialized EKF {self.track_id} at ({self.x[0]:.2f}, {self.x[1]:.2f})')
+        self.node.get_logger().info(f'Initialized EKF for Robot {self.track_id} at ({initial_pose.position.x:.2f}, {initial_pose.position.y:.2f})')
 
     def predict(self, dt: float):
         x, y, theta, v, omega = self.x
@@ -56,6 +47,15 @@ class SingleEKF:
         x_pred = x + v * np.cos(theta) * dt
         y_pred = y + v * np.sin(theta) * dt
         theta_pred = self.normalize_angle(theta + omega * dt)
+
+        # Reflexion an Wänden
+        if x_pred <= self.x_min or x_pred >= self.x_max:
+            theta_pred = math.pi - theta_pred
+            x_pred = np.clip(x_pred, self.x_min, self.x_max)
+
+        if y_pred <= self.y_min or y_pred >= self.y_max:
+            theta_pred = -theta_pred
+            y_pred = np.clip(y_pred, self.y_min, self.y_max)
 
         self.x = np.array([x_pred, y_pred, theta_pred, v, omega])
 
@@ -67,35 +67,38 @@ class SingleEKF:
         F[2, 4] = dt
 
         self.P = F @ self.P @ F.T + self.Q
-        self.missed_updates += 1
 
-    def update(self, measurement: Pose):
-        H = np.array([[1, 0, 0, 0, 0],
-                      [0, 1, 0, 0, 0]])
+    def update(self, measurement: Pose, sensor_type: str = "camera"):
+        if sensor_type == "camera":
+            R_mat = np.diag([0.02, 0.02])
+        elif sensor_type == "lidar":
+            R_mat = np.diag([0.05, 0.05])
+        else:
+            R_mat = np.diag([0.1, 0.1])
 
+        H = np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
         z_measured = np.array([measurement.position.x, measurement.position.y])
         z_predicted = H @ self.x
 
         y = z_measured - z_predicted
-        S = H @ self.P @ H.T + self.R
+        S = H @ self.P @ H.T + R_mat
         K = self.P @ H.T @ np.linalg.inv(S)
 
         self.x = self.x + K @ y
         self.P = (np.eye(5) - K @ H) @ self.P
-        self.missed_updates = 0
 
     def get_mahalanobis_distance(self, measurement: Pose):
-        H = np.array([[1, 0, 0, 0, 0],
-                      [0, 1, 0, 0, 0]])
+        H = np.array([[1, 0, 0, 0, 0], [0, 1, 0, 0, 0]])
         z_measured = np.array([measurement.position.x, measurement.position.y])
         z_predicted = H @ self.x
         y = z_measured - z_predicted
-        S = H @ self.P @ H.T + self.R
+        S = H @ self.P @ H.T + np.diag([0.02, 0.02])
 
         try:
-            return y.T @ np.linalg.inv(S) @ y
+            d2 = y.T @ np.linalg.inv(S) @ y
+            return d2
         except np.linalg.LinAlgError:
-            self.node.get_logger().warn(f"Singular matrix in Mahalanobis distance for EKF {self.track_id}")
+            self.node.get_logger().warn(f"Singular matrix in Mahalanobis distance for EKF {self.track_id}.")
             return float('inf')
 
     def publish_odometry(self):
@@ -125,54 +128,37 @@ class SingleEKF:
         eigenvals, eigenvecs = np.linalg.eig(P_xy)
 
         if np.any(eigenvals < 0):
-            self.node.get_logger().warn(f'Negative eigenvalues in EKF {self.track_id}')
+            self.node.get_logger().warn(f'Negative Eigenwerte in Covariance EKF {self.track_id}')
             return
 
         chi2_val = 5.991
         major, minor = 2 * np.sqrt(chi2_val * eigenvals)
         angle = np.arctan2(eigenvecs[1, 0], eigenvecs[0, 0])
 
-        ellipse = Marker()
-        ellipse.header.frame_id = "map"
-        ellipse.header.stamp = self.node.get_clock().now().to_msg()
-        ellipse.ns = f"cov_ellipse_{self.track_id}"
-        ellipse.id = self.track_id
-        ellipse.type = Marker.CYLINDER
-        ellipse.action = Marker.ADD
+        marker = Marker()
+        marker.header.frame_id = "map"
+        marker.header.stamp = self.node.get_clock().now().to_msg()
+        marker.ns = f"cov_ellipse_{self.track_id}"
+        marker.id = self.track_id
+        marker.type = Marker.CYLINDER
+        marker.action = Marker.ADD
 
-        ellipse.pose.position.x = self.x[0]
-        ellipse.pose.position.y = self.x[1]
-        ellipse.pose.position.z = 0.01
-        ellipse.pose.orientation.z = np.sin(angle / 2)
-        ellipse.pose.orientation.w = np.cos(angle / 2)
+        marker.pose.position.x = self.x[0]
+        marker.pose.position.y = self.x[1]
+        marker.pose.position.z = 0.01
 
-        ellipse.scale.x = major
-        ellipse.scale.y = minor
-        ellipse.scale.z = 0.01
+        marker.pose.orientation.z = np.sin(angle / 2)
+        marker.pose.orientation.w = np.cos(angle / 2)
 
-        ellipse.color = TRACK_COLORS[self.track_id % len(TRACK_COLORS)]
-        self.marker_pub.publish(ellipse)
+        marker.scale.x = major
+        marker.scale.y = minor
+        marker.scale.z = 0.01
 
-        text = Marker()
-        text.header.frame_id = "map"
-        text.header.stamp = self.node.get_clock().now().to_msg()
-        text.ns = f"text_{self.track_id}"
-        text.id = 1000 + self.track_id
-        text.type = Marker.TEXT_VIEW_FACING
-        text.action = Marker.ADD
-
-        text.pose.position.x = self.x[0]
-        text.pose.position.y = self.x[1]
-        text.pose.position.z = 0.5
-        text.scale.z = 0.3
-        text.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=1.0)
-        text.text = f"ID {self.track_id}"
-
-        self.marker_pub.publish(text)
+        marker.color = ColorRGBA(r=1.0, g=0.0, b=0.0, a=0.5)
+        self.marker_pub.publish(marker)
 
     def normalize_angle(self, angle):
         return (angle + np.pi) % (2 * np.pi) - np.pi
-
 
 class EKFTracker(Node):
     def __init__(self):
@@ -182,11 +168,13 @@ class EKFTracker(Node):
         self.num_robots_to_track = self.get_parameter('num_robots_to_track').value
 
         self.tracked_ekfs = {i: None for i in range(self.num_robots_to_track)}
+        self.GATE_THRESHOLD = 30
+
         self.detection_buffer = []
         self.buffer_lock = threading.Lock()
 
-        self.create_subscription(PoseArray, '/detections/camera_1', self.camera_callback, 10)
-        self.create_subscription(PoseArray, '/detections/camera_2', self.camera_callback, 10)
+        self.create_subscription(PoseArray, '/detections/camera_1', lambda msg: self.camera_callback(msg, "camera"), 10)
+        self.create_subscription(PoseArray, '/detections/camera_2', lambda msg: self.camera_callback(msg, "camera"), 10)
         self.create_subscription(LidarArray, '/detections/lidar_1', self.lidar_callback, 10)
 
         self.timer = self.create_timer(0.1, self.timer_callback)
@@ -194,60 +182,69 @@ class EKFTracker(Node):
 
         self.get_logger().info("EKF Tracker initialized.")
 
-    def camera_callback(self, msg: PoseArray):
+    def camera_callback(self, msg: PoseArray, sensor_type: str):
         with self.buffer_lock:
-            self.detection_buffer.extend(msg.poses)
+            for pose in msg.poses:
+                self.detection_buffer.append((pose, sensor_type))
 
     def lidar_callback(self, msg: LidarArray):
         with self.buffer_lock:
-            for d in msg.detections:
+            for detection in msg.detections:
+                x = detection.distance * math.cos(detection.angle)
+                y = detection.distance * math.sin(detection.angle)
                 pose = Pose()
-                pose.position.x = d.distance * math.cos(d.angle)
-                pose.position.y = d.distance * math.sin(d.angle)
+                pose.position.x = x
+                pose.position.y = y
+                pose.position.z = 0.0
                 pose.orientation.w = 1.0
-                self.detection_buffer.append(pose)
+                self.detection_buffer.append((pose, "lidar"))
 
     def timer_callback(self):
         now = self.get_clock().now()
         dt = (now - self.last_timer_time).nanoseconds / 1e9
         self.last_timer_time = now
 
+        for ekf in self.tracked_ekfs.values():
+            if ekf:
+                ekf.predict(dt)
+
         with self.buffer_lock:
             detections = list(self.detection_buffer)
             self.detection_buffer.clear()
 
+        assignments = {i: None for i in self.tracked_ekfs}
         initialized_ids = [i for i, ekf in self.tracked_ekfs.items() if ekf]
-        cost_matrix = np.full((len(detections), len(initialized_ids)), np.inf)
+        cost_matrix = np.full((len(detections), len(initialized_ids)), float('inf'))
 
-        for i, det in enumerate(detections):
-            for j, ekf_id in enumerate(initialized_ids):
-                cost = self.tracked_ekfs[ekf_id].get_mahalanobis_distance(det)
+        for i, (det, _) in enumerate(detections):
+            for j, robot_id in enumerate(initialized_ids):
+                cost = self.tracked_ekfs[robot_id].get_mahalanobis_distance(det)
                 cost_matrix[i, j] = cost
 
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        used_detections = set()
-        assignments = {}
+        used_indices = set()
 
-        for i, j in zip(row_ind, col_ind):
-            if cost_matrix[i, j] < GATE_THRESHOLD:
-                ekf_id = initialized_ids[j]
-                assignments[ekf_id] = detections[i]
-                used_detections.add(i)
+        for det_idx, col_idx in zip(row_ind, col_ind):
+            robot_id = initialized_ids[col_idx]
+            if cost_matrix[det_idx, col_idx] < self.GATE_THRESHOLD:
+                assignments[robot_id] = detections[det_idx]
+                used_indices.add(det_idx)
 
-        for ekf_id, ekf in self.tracked_ekfs.items():
+        unassigned_detections = [detections[i] for i in range(len(detections)) if i not in used_indices]
+        uninitialized_ids = [i for i, ekf in self.tracked_ekfs.items() if ekf is None]
+
+        for robot_id in uninitialized_ids:
+            if unassigned_detections:
+                pose, sensor = unassigned_detections.pop(0)
+                self.tracked_ekfs[robot_id] = SingleEKF(pose, self, robot_id)
+            else:
+                break
+
+        for robot_id, ekf in self.tracked_ekfs.items():
+            if ekf and assignments[robot_id]:
+                ekf.update(assignments[robot_id][0], assignments[robot_id][1])
             if ekf:
-                if ekf_id in assignments:
-                    ekf.update(assignments[ekf_id])
-                ekf.predict(dt)
                 ekf.publish_odometry()
-
-        # Initialisierung nur falls EKF noch nie existierte
-        for i, ekf in self.tracked_ekfs.items():
-            if ekf is None:
-                new_detections = [detections[j] for j in range(len(detections)) if j not in used_detections]
-                if new_detections:
-                    self.tracked_ekfs[i] = SingleEKF(new_detections.pop(0), self, i)
-                    used_detections.add(0)  # Vermeide doppelte Nutzung
 
 def main(args=None):
     rclpy.init(args=args)
