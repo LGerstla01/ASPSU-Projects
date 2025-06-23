@@ -36,7 +36,7 @@ class RobotControllerNode(Node):
             robot['angle'] += random.uniform(-0.2, 0.2)  # Kleine zufällige Änderung pro Schritt
 
             # Update position
-            robot['x'] += math.cos(robot['angle']) * 0.3  # Move forward (0.5 units per step)
+            robot['x'] += math.cos(robot['angle']) * 0.3 
             robot['y'] += math.sin(robot['angle']) * 0.3
 
             # Check for collisions with walls and bounce
