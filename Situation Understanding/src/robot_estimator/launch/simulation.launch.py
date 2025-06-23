@@ -107,7 +107,7 @@ def generate_launch_description():
             parameters=[
                 {'room_size': room_size},
                 {'num_lidar': num_lidar},
-                {'angle_lidar': 20},
+                {'angle_lidar': 10},
             ],
         ),
         

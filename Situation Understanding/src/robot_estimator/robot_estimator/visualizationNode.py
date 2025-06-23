@@ -16,7 +16,7 @@ class VisualizationNode(Node):
         self.declare_parameter('num_cameras', 2)
         self.declare_parameter('FOV', 50.0)  # Field of view in degrees
         self.declare_parameter('num_lidar', 1)  # Field of view in degrees
-        self.declare_parameter('angle_lidar', 20)
+        self.declare_parameter('angle_lidar', 10)
         self.declare_parameter('room_size', [40.0, 30.0, 3.0])  # [width, height]
 
         self.num_robots = self.get_parameter('num_robots').value

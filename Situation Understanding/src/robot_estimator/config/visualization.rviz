@@ -11,7 +11,7 @@ Panels:
         - /Room1/Topic1
         - /Room1/Namespaces1
         - /Robots1
-        - /EKF Tracked Robots1 # NEU: Eintrag für EKF-Roboter
+        - /EKF Tracked Robots1 
       Splitter Ratio: 0.5
     Tree Height: 746
   - Class: rviz_common/Selection
