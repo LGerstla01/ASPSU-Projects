@@ -13,8 +13,12 @@ import threading
 from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import DBSCAN
 
+# SingleEKF class represents an Extended Kalman Filter (EKF) for tracking a single robot.
 class SingleEKF:
     def __init__(self, initial_pose: Pose, node: Node, track_id: int):
+        # Initializes the EKF with the robot's initial pose and assigns a unique track ID.
+        # Sets up the state vector, covariance matrix, process noise, and publishers for odometry and visualization.
+
         self.node = node
         self.track_id = track_id
 
@@ -45,6 +49,10 @@ class SingleEKF:
         self.node.get_logger().info(f'Initialized EKF for Robot {self.track_id} at ({initial_pose.position.x:.2f}, {initial_pose.position.y:.2f})')
 
     def predict(self, dt: float):
+        # Predicts the robot's state based on the elapsed time (dt) and the current state.
+        # Updates the state vector and covariance matrix using the motion model.
+        # Handles boundary conditions to keep the robot within predefined limits.
+
         x, y, theta, v, omega = self.x
         x_pred = x + v * np.cos(theta) * dt
         y_pred = y + v * np.sin(theta) * dt
@@ -70,6 +78,10 @@ class SingleEKF:
         self.P = F @ self.P @ F.T + self.Q
 
     def update(self, measurement: Pose, sensor_type):
+        # Updates the EKF state using a new measurement from a sensor (camera or lidar).
+        # Computes the measurement residual, Kalman gain, and updates the state vector and covariance matrix.
+        # Handles velocity and angular velocity estimation based on the measurement.
+
         # Messung vektorisieren + passende R wählen
         if sensor_type == "camera":
             quat = [measurement.orientation.x, measurement.orientation.y,
@@ -153,6 +165,9 @@ class SingleEKF:
             self.last_meas_theta = None
 
     def get_mahalanobis_distance(self, measurement: Pose, sensor_type: str):
+        # Computes the Mahalanobis distance between the predicted state and a given measurement.
+        # Used for associating measurements with tracks during the assignment phase.
+
         # Messung als Vektor
         if sensor_type == "camera":
             quat = [measurement.orientation.x, measurement.orientation.y,
@@ -185,6 +200,9 @@ class SingleEKF:
             return float('inf')
 
     def publish_odometry(self):
+        # Publishes the robot's current state as an odometry message.
+        # Also publishes visualization markers for the covariance ellipse and velocity arrow.
+
         odom = Odometry()
         odom.header.stamp = self.node.get_clock().now().to_msg()
         odom.header.frame_id = 'map'
@@ -208,6 +226,9 @@ class SingleEKF:
         self.publish_velocity_arrow()
 
     def publish_covariance_ellipse(self):
+        # Publishes a visualization marker representing the covariance ellipse of the EKF.
+        # The ellipse shows the uncertainty in the robot's position.
+
         P_xy = self.P[0:2, 0:2]
         eigenvals, eigenvecs = np.linalg.eig(P_xy)
 
@@ -242,9 +263,15 @@ class SingleEKF:
         self.marker_pub.publish(marker)
 
     def normalize_angle(self, angle):
+        # Normalizes an angle to the range [-pi, pi].
+        # Ensures consistent angle representation for calculations.
+
         return (angle + np.pi) % (2 * np.pi) - np.pi
     
     def publish_velocity_arrow(self):
+        # Publishes a visualization marker representing the robot's velocity as an arrow.
+        # The arrow shows the direction and magnitude of the velocity.
+
         marker = Marker()
         marker.header.frame_id = "map"
         marker.header.stamp = self.node.get_clock().now().to_msg()
@@ -271,6 +298,8 @@ class SingleEKF:
         self.marker_pub.publish(marker)
 
     def _make_point(self, x, y):
+        # Helper function to create a Point object for visualization markers.
+
         from geometry_msgs.msg import Point
         p = Point()
         p.x = x
@@ -279,6 +308,9 @@ class SingleEKF:
         return p
     
     def h_of_x(self, x, sensor_type):
+        # Defines the measurement model for the EKF based on the sensor type.
+        # Camera measures position and orientation, lidar measures position only.
+
         if sensor_type == "camera":
             return np.array([x[0], x[1], x[2]])  # misst Position + Richtung
         elif sensor_type == "lidar":
@@ -287,6 +319,9 @@ class SingleEKF:
             return np.array([x[0], x[1]])        # fallback
 
     def compute_H(self, x, sensor_type, eps=1e-5):
+        # Computes the Jacobian matrix of the measurement model for the EKF.
+        # Used for linearizing the measurement model during the update step.
+
         h0 = self.h_of_x(x, sensor_type)
         H = np.zeros((len(h0), len(x)))
         for i in range(len(x)):
@@ -296,8 +331,12 @@ class SingleEKF:
             H[:, i] = (h_perturbed - h0) / eps
         return H
     
+# EKFTracker class manages multiple EKFs for tracking multiple robots.
 class EKFTracker(Node):
     def __init__(self):
+        # Initializes the EKF tracker node and sets up parameters, subscriptions, and timers.
+        # Creates a dictionary to manage multiple EKFs and a buffer for incoming sensor measurements.
+
         super().__init__('ekf_tracker')
         self.declare_parameter('num_robots_to_track', 2)
         self.num_robots_to_track = self.get_parameter('num_robots_to_track').value
@@ -318,15 +357,24 @@ class EKFTracker(Node):
         self.get_logger().info("EKF Tracker initialized.")
 
     def is_track_stale(self, ekf: SingleEKF, now):
+        # Checks if a track is stale based on the time since its last update.
+        # Used to remove tracks that are no longer receiving measurements.
+
         time_since_update = (now - ekf.last_update_time).nanoseconds / 1e9
         return time_since_update > 15.0
 
     def camera_callback(self, msg: PoseArray, sensor_type: str):
+        # Callback function for camera detections.
+        # Adds detected poses to the detection buffer for processing.
+
         with self.buffer_lock:
             for pose in msg.poses:
                 self.detection_buffer.append((pose, sensor_type))
 
     def lidar_callback(self, msg: LidarArray):
+        # Callback function for lidar detections.
+        # Converts lidar detections to poses and adds them to the detection buffer.
+
         lidar_origin_x = 0.0
         lidar_origin_y = -15.0
         with self.buffer_lock:
@@ -341,7 +389,11 @@ class EKFTracker(Node):
                 pose.orientation.w = 1.0
                 self.detection_buffer.append((pose, "lidar"))
 
-    def cluster_measurements(self, poses, distance_threshold=1.5):
+    def cluster_measurements(self, poses, distance_threshold=1):
+        # Clusters sensor measurements using DBSCAN to group nearby detections.
+        # Handles noise points by adding them as pseudo-clusters if slots are available.
+        # Returns a list of clusters for further processing.
+
         if not poses:
             self.get_logger().info("Keine Posen zum Clustern.")
             return []
@@ -385,7 +437,10 @@ class EKFTracker(Node):
 
         return clusters
 
-    def merge_clusters(self, clusters, merge_distance=0.5):
+    def merge_clusters(self, clusters, merge_distance=1):
+        # Merges clusters that are close to each other into a single cluster.
+        # Used to reduce redundancy and improve tracking accuracy.
+
         merged_clusters = []
         while clusters:
             cluster = clusters.pop(0)
@@ -398,6 +453,11 @@ class EKFTracker(Node):
         return merged_clusters
 
     def timer_callback(self):
+        # Main processing loop for the EKF tracker.
+        # Predicts the state of all active EKFs, processes sensor measurements, clusters detections,
+        # assigns detections to tracks, initializes new tracks, and updates existing tracks.
+        # Publishes odometry and visualization markers for all tracks.
+
         now = self.get_clock().now()
         dt = (now - self.last_timer_time).nanoseconds / 1e9
         self.last_timer_time = now
@@ -509,9 +569,19 @@ class EKFTracker(Node):
             if ekf:
                 ekf.publish_odometry()
 
+        # 10. Check for unassigned EKFs and log warning
+        for ekf_id, ekf in self.tracked_ekfs.items():
+            if ekf and ekf_id not in assignments:
+                x, y = ekf.x[0], ekf.x[1]
+                self.get_logger().warn(
+                    f"[WARNING] Track {ekf_id} (estimated at {x:.2f}, {y:.2f}) received no detection in this cycle."
+                )
+
         self.get_logger().info("------ Frame End ------\n")
 
 def main(args=None):
+    # Entry point for the EKF tracker node.
+    # Initializes the ROS node, starts the EKF tracker, and spins until shutdown.
     rclpy.init(args=args)
     tracker = EKFTracker()
     rclpy.spin(tracker)
