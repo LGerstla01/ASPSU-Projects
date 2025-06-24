@@ -24,7 +24,7 @@ class SingleEKF:
         self.x = np.array([initial_pose.position.x, initial_pose.position.y, initial_yaw, 0.0, 0.0])
         self.P = np.eye(5) * 1.0
 
-        self.Q = np.diag([0.05, 0.05, 0.02, 0.2, 0.2])
+        self.Q = np.diag([0.0025, 0.0025, 0.0004, 0.04, 0.04])
 
         self.last_time = self.node.get_clock().now()
         self.last_update_time = self.last_time
@@ -75,13 +75,10 @@ class SingleEKF:
                     measurement.orientation.z, measurement.orientation.w]
             yaw = R.from_quat(quat).as_euler('zyx')[0]
             z_measured = np.array([measurement.position.x, measurement.position.y, yaw])
-            R_mat = np.diag([0.005, 0.005, 0.01])
+            R_mat = np.diag([0.3**2, 0.3**2, 0.1**2])
         elif sensor_type == "lidar":
             z_measured = np.array([measurement.position.x, measurement.position.y])
-            R_mat = np.diag([0.05, 0.05])
-        else:
-            z_measured = np.array([measurement.position.x, measurement.position.y])
-            R_mat = np.diag([0.1, 0.1])
+            R_mat = np.diag([0.5**2, 0.5**2])
 
         # Nichtlineare Vorhersage
         z_predicted = self.h_of_x(self.x, sensor_type)
@@ -152,10 +149,10 @@ class SingleEKF:
                     measurement.orientation.z, measurement.orientation.w]
             yaw = R.from_quat(quat).as_euler('zyx')[0]
             z_measured = np.array([measurement.position.x, measurement.position.y, yaw])
-            R_mat = np.diag([0.005, 0.005, 0.01])
+            R_mat = np.diag([0.04, 0.04, 0.0001])
         elif sensor_type == "lidar":
             z_measured = np.array([measurement.position.x, measurement.position.y])
-            R_mat = np.diag([0.05, 0.05])
+            R_mat = np.diag([0.04, 0.04])
         else:
             z_measured = np.array([measurement.position.x, measurement.position.y])
             R_mat = np.diag([0.1, 0.1])
@@ -312,7 +309,7 @@ class EKFTracker(Node):
 
     def is_track_stale(self, ekf: SingleEKF, now):
         time_since_update = (now - ekf.last_update_time).nanoseconds / 1e9
-        return time_since_update > 6.0
+        return time_since_update > 15.0
 
     def camera_callback(self, msg: PoseArray, sensor_type: str):
         with self.buffer_lock:
@@ -334,57 +331,132 @@ class EKFTracker(Node):
                 pose.orientation.w = 1.0
                 self.detection_buffer.append((pose, "lidar"))
 
+    def cluster_measurements(self, poses, distance_threshold=1.0):
+        if not poses:
+            self.get_logger().info("Keine Posen zum Clustern.")
+            return []
+
+        positions = np.array([[p.position.x, p.position.y] for p, _ in poses])
+        used = np.full(len(positions), False)
+        clusters = []
+
+        # Übersicht aller Detektionen
+        self.get_logger().info("Erkannte Posen:")
+        for idx, (p, sensor) in enumerate(poses):
+            self.get_logger().info(f"  [{idx}] {sensor} → ({p.position.x:.2f}, {p.position.y:.2f})")
+
+        for i, pos in enumerate(positions):
+            if used[i]:
+                continue
+            cluster = [i]
+            used[i] = True
+            for j in range(i + 1, len(positions)):
+                if not used[j] and np.linalg.norm(positions[j] - pos) < distance_threshold:
+                    cluster.append(j)
+                    used[j] = True
+
+            cluster_positions = positions[cluster]
+            mean_pos = np.mean(cluster_positions, axis=0)
+
+            mean_pose = Pose()
+            mean_pose.position.x = mean_pos[0]
+            mean_pose.position.y = mean_pos[1]
+            mean_pose.orientation.w = 1.0
+
+            sensor_type = poses[cluster[0]][1]
+            clusters.append((mean_pose, sensor_type))
+
+            # Debug-Ausgabe zum aktuellen Cluster
+            cluster_str = ", ".join(f"{idx}" for idx in cluster)
+            self.get_logger().info(f"Cluster gefunden mit {len(cluster)} Element(en): [{cluster_str}]")
+            self.get_logger().info(f"→ Cluster-Zentrum: ({mean_pos[0]:.2f}, {mean_pos[1]:.2f})")
+
+        self.get_logger().info(f"Insgesamt {len(clusters)} Cluster erzeugt.\n")
+        return clusters
+
     def timer_callback(self):
         now = self.get_clock().now()
         dt = (now - self.last_timer_time).nanoseconds / 1e9
         self.last_timer_time = now
 
-        for robot_id, ekf in self.tracked_ekfs.items():
+        # 1. Vorhersagephase für alle aktiven EKFs
+        for ekf in self.tracked_ekfs.values():
             if ekf:
                 ekf.predict(dt)
 
+        # 2. Entferne veraltete EKFs
         for robot_id, ekf in list(self.tracked_ekfs.items()):
             if ekf and self.is_track_stale(ekf, now):
                 self.get_logger().info(f"Removing stale EKF {robot_id}")
                 self.tracked_ekfs[robot_id] = None
 
+        # 3. Sensor-Messungen aus Puffer holen
         with self.buffer_lock:
-            detections = list(self.detection_buffer)
+            raw_detections = list(self.detection_buffer)
             self.detection_buffer.clear()
 
-        assignments = {i: None for i in self.tracked_ekfs}
-        initialized_ids = [i for i, ekf in self.tracked_ekfs.items() if ekf]
-        cost_matrix = np.full((len(detections), len(initialized_ids)), float('inf'))
+        if not raw_detections:
+            self.get_logger().info("No detections this cycle.")
+            return
 
-        for i, (det, sensor) in enumerate(detections):
-            for j, robot_id in enumerate(initialized_ids):
-                cost = self.tracked_ekfs[robot_id].get_mahalanobis_distance(det, sensor)
-                cost_matrix[i, j] = cost
+        # 3a. Clustering der Detektionen
+        detections = self.cluster_measurements(raw_detections, distance_threshold=0.75)
+        self.get_logger().info(f"Clustered {len(raw_detections)} raw detections into {len(detections)} clusters.")
 
+        # 4. Aktive EKFs und Cluster vorbereiten
+        active_ekfs = [(i, ekf) for i, ekf in self.tracked_ekfs.items() if ekf is not None]
+        ekf_ids = [i for i, _ in active_ekfs]
+        ekfs = [ekf for _, ekf in active_ekfs]
+
+        # 5. Mahalanobis-Distanzen berechnen
+        cost_matrix = np.full((len(ekfs), len(detections)), float('inf'))
+        for i, ekf in enumerate(ekfs):
+            for j, (pose, sensor_type) in enumerate(detections):
+                cost_matrix[i, j] = ekf.get_mahalanobis_distance(pose, sensor_type)
+
+        # 6. Zuordnungen bestimmen mit Konfliktauflösung
+        from scipy.optimize import linear_sum_assignment
         row_ind, col_ind = linear_sum_assignment(cost_matrix)
-        used_indices = set()
+        assigned_clusters = set()
+        assignments = {}
 
-        for det_idx, col_idx in zip(row_ind, col_ind):
-            robot_id = initialized_ids[col_idx]
-            if cost_matrix[det_idx, col_idx] < self.GATE_THRESHOLD:
-                assignments[robot_id] = detections[det_idx]
-                used_indices.add(det_idx)
+        for ekf_idx, det_idx in zip(row_ind, col_ind):
+            cost = cost_matrix[ekf_idx, det_idx]
+            if cost < 20 and det_idx not in assigned_clusters:
+                ekf_id = ekf_ids[ekf_idx]
+                assignments[ekf_id] = detections[det_idx]
+                assigned_clusters.add(det_idx)
 
-        unassigned_detections = [detections[i] for i in range(len(detections)) if i not in used_indices]
-        uninitialized_ids = [i for i, ekf in self.tracked_ekfs.items() if ekf is None]
+        # 7. Debug-Ausgaben
+        self.get_logger().info("----- Frame Start -----")
+        for i, (pose, sensor) in enumerate(detections):
+            self.get_logger().info(f"Detected[{i}] from Clusters: ({pose.position.x:.2f}, {pose.position.y:.2f})")
 
-        for robot_id in uninitialized_ids:
-            if unassigned_detections:
+        for ekf_id, ekf in self.tracked_ekfs.items():
+            if ekf:
+                x, y = ekf.x[0], ekf.x[1]
+                self.get_logger().info(f"Track {ekf_id}: Estimated at ({x:.2f}, {y:.2f})")
+                if ekf_id in assignments:
+                    meas = assignments[ekf_id][0]
+                    self.get_logger().info(f" → Assigned Measurement: ({meas.position.x:.2f}, {meas.position.y:.2f})")
+
+        # 8. Unzugewiesene Detections → Initialisierung von leeren Tracks
+        unassigned_detections = [detections[i] for i in range(len(detections)) if i not in assigned_clusters]
+        for i, ekf in self.tracked_ekfs.items():
+            if ekf is None and unassigned_detections:
                 pose, sensor = unassigned_detections.pop(0)
-                self.tracked_ekfs[robot_id] = SingleEKF(pose, self, robot_id)
-            else:
-                break
+                self.tracked_ekfs[i] = SingleEKF(pose, self, i)
+                self.get_logger().info(f"→ New EKF {i} initialized at ({pose.position.x:.2f}, {pose.position.y:.2f})")
 
-        for robot_id, ekf in self.tracked_ekfs.items():
-            if ekf and assignments[robot_id]:
-                ekf.update(assignments[robot_id][0], assignments[robot_id][1])
+        # 9. EKFs mit zugewiesener Messung aktualisieren
+        for ekf_id, ekf in self.tracked_ekfs.items():
+            if ekf and ekf_id in assignments:
+                pose, sensor = assignments[ekf_id]
+                ekf.update(pose, sensor)
             if ekf:
                 ekf.publish_odometry()
+
+        self.get_logger().info("------ Frame End ------\n")
 
 def main(args=None):
     rclpy.init(args=args)
