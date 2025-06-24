@@ -3,6 +3,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import Header
 import numpy as np
+import tf_transformations
 
 class CameraDetectionNode(Node):
     def __init__(self):
@@ -10,7 +11,7 @@ class CameraDetectionNode(Node):
         self.declare_parameter('num_cameras', 2)
         self.declare_parameter('room_size', [40.0, 30.0, 3.0])  # [width, height, height]
         self.declare_parameter('camera_fov', 40.0)  # Field of view in degrees
-        self.declare_parameter('noise', 0.2)
+        self.declare_parameter('noise', 0.3)
 
         self.num_cameras = self.get_parameter('num_cameras').value
         self.room_size = self.get_parameter('room_size').value
@@ -98,8 +99,24 @@ class CameraDetectionNode(Node):
         noisy_pose = Pose()
         noisy_pose.position.x = pose.position.x + np.random.normal(0, self.noise)  # Add Gaussian noise
         noisy_pose.position.y = pose.position.y + np.random.normal(0, self.noise)
-        noisy_pose.position.z = pose.position.z  # No noise in z-axis
-        noisy_pose.orientation = pose.orientation  # Keep orientation unchanged
+        noisy_pose.position.z = pose.position.z  
+        
+        # Add noise to yaw angle
+        # Convert quaternion to euler
+        quat = [
+            pose.orientation.x,
+            pose.orientation.y,
+            pose.orientation.z,
+            pose.orientation.w
+        ]
+        roll, pitch, yaw = tf_transformations.euler_from_quaternion(quat)
+        yaw += np.random.normal(0, self.noise/3)  # Add Gaussian noise to yaw
+        # Convert back to quaternion
+        noisy_quat = tf_transformations.quaternion_from_euler(roll, pitch, yaw)
+        noisy_pose.orientation.x = noisy_quat[0]
+        noisy_pose.orientation.y = noisy_quat[1]
+        noisy_pose.orientation.z = noisy_quat[2]
+        noisy_pose.orientation.w = noisy_quat[3]
         return noisy_pose
 
 def main(args=None):

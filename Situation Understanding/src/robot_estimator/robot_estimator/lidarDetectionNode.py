@@ -11,7 +11,7 @@ class lidarDetectionNode(Node):
         self.declare_parameter('room_size', [40.0, 30.0, 3.0])  # [width, height, height]
         self.declare_parameter('num_lidar', 1) 
         self.declare_parameter('angle_lidar', 10)
-        self.declare_parameter('noise_dist', 0.2)
+        self.declare_parameter('noise_dist', 0.5)
         self.declare_parameter('noise_angle', 0.1)
 
         self.room_size = self.get_parameter('room_size').value

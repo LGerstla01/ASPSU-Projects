@@ -95,7 +95,6 @@ def generate_launch_description():
                 {'num_cameras': num_cameras},
                 {'room_size': room_size},
                 {'FOV': FOV},
-                {'noise': 0.2},
             ],
         ),
         
