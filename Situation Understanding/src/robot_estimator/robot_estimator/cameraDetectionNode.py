@@ -3,7 +3,11 @@ from rclpy.node import Node
 from geometry_msgs.msg import PoseArray, Pose
 from std_msgs.msg import Header
 import numpy as np
-import tf_transformations
+from scipy.spatial.transform import Rotation as R
+
+# Patch numpy for compatibility with tf_transformations
+if not hasattr(np, 'float'):
+    np.float = float  # Add alias for compatibility
 
 class CameraDetectionNode(Node):
     def __init__(self):
@@ -100,7 +104,7 @@ class CameraDetectionNode(Node):
         noisy_pose.position.x = pose.position.x + np.random.normal(0, self.noise)  # Add Gaussian noise
         noisy_pose.position.y = pose.position.y + np.random.normal(0, self.noise)
         noisy_pose.position.z = pose.position.z  
-        
+
         # Add noise to yaw angle
         # Convert quaternion to euler
         quat = [
@@ -109,10 +113,11 @@ class CameraDetectionNode(Node):
             pose.orientation.z,
             pose.orientation.w
         ]
-        roll, pitch, yaw = tf_transformations.euler_from_quaternion(quat)
-        yaw += np.random.normal(0, self.noise/3)  # Add Gaussian noise to yaw
+        rotation = R.from_quat(quat)
+        roll, pitch, yaw = rotation.as_euler('xyz')
+        yaw += np.random.normal(0, self.noise / 3)  # Add Gaussian noise to yaw
         # Convert back to quaternion
-        noisy_quat = tf_transformations.quaternion_from_euler(roll, pitch, yaw)
+        noisy_quat = R.from_euler('xyz', [roll, pitch, yaw]).as_quat()
         noisy_pose.orientation.x = noisy_quat[0]
         noisy_pose.orientation.y = noisy_quat[1]
         noisy_pose.orientation.z = noisy_quat[2]
