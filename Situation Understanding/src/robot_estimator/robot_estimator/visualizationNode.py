@@ -1,5 +1,3 @@
-# visualizer.py
-
 import rclpy
 from rclpy.node import Node
 import matplotlib.pyplot as plt
