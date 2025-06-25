@@ -77,10 +77,9 @@ class SingleEKF:
 
         self.P = F @ self.P @ F.T + self.Q
 
-    def update(self, measurement: Pose, sensor_type):
+    def update(self, measurement: Pose, sensor_type, increased_uncertainty=False):
         # Updates the EKF state using a new measurement from a sensor (camera or lidar).
-        # Computes the measurement residual, Kalman gain, and updates the state vector and covariance matrix.
-        # Handles velocity and angular velocity estimation based on the measurement.
+        # Adds logic for increased uncertainty when using secondary threshold detections.
 
         # Messung vektorisieren + passende R wählen
         if sensor_type == "camera":
@@ -93,9 +92,12 @@ class SingleEKF:
             z_measured = np.array([measurement.position.x, measurement.position.y])
             R_mat = np.diag([0.3**2, 0.3**2])  # Reduced measurement noise for lidar
         else:
-            # Fallback for unexpected sensor types
             z_measured = np.array([measurement.position.x, measurement.position.y])
             R_mat = np.diag([0.5**2, 0.5**2])
+
+        # Increase uncertainty for secondary threshold detections
+        if increased_uncertainty:
+            R_mat *= 2.0  # Double the measurement noise
 
         # Nichtlineare Vorhersage
         z_predicted = self.h_of_x(self.x, sensor_type)
@@ -331,6 +333,24 @@ class SingleEKF:
             H[:, i] = (h_perturbed - h0) / eps
         return H
     
+    def publish_delete_markers(self):
+        # Publishes DELETE markers to remove visualization for this track.
+        delete_marker = Marker()
+        delete_marker.header.frame_id = "map"
+        delete_marker.header.stamp = self.node.get_clock().now().to_msg()
+        delete_marker.ns = f"cov_ellipse_{self.track_id}"
+        delete_marker.id = self.track_id
+        delete_marker.action = Marker.DELETE
+        self.marker_pub.publish(delete_marker)
+
+        delete_velocity_marker = Marker()
+        delete_velocity_marker.header.frame_id = "map"
+        delete_velocity_marker.header.stamp = self.node.get_clock().now().to_msg()
+        delete_velocity_marker.ns = f"velocity_arrow_{self.track_id}"
+        delete_velocity_marker.id = self.track_id
+        delete_velocity_marker.action = Marker.DELETE
+        self.marker_pub.publish(delete_velocity_marker)
+    
 # EKFTracker class manages multiple EKFs for tracking multiple robots.
 class EKFTracker(Node):
     def __init__(self):
@@ -338,11 +358,12 @@ class EKFTracker(Node):
         # Creates a dictionary to manage multiple EKFs and a buffer for incoming sensor measurements.
 
         super().__init__('ekf_tracker')
-        self.declare_parameter('num_robots_to_track', 2)
+        self.declare_parameter('num_robots_to_track', 6)
         self.num_robots_to_track = self.get_parameter('num_robots_to_track').value
 
         self.tracked_ekfs = {i: None for i in range(self.num_robots_to_track)}
-        self.GATE_THRESHOLD = 20
+        self.GATE_THRESHOLD_PRIMARY = 20
+        self.GATE_THRESHOLD_SECONDARY = 100
 
         self.detection_buffer = []
         self.buffer_lock = threading.Lock()
@@ -395,83 +416,83 @@ class EKFTracker(Node):
         self.last_timer_time = now
 
         # 1. Prediction
-        for ekf in self.tracked_ekfs.values():
+        for ekf_id, ekf in self.tracked_ekfs.items():
             if ekf:
                 ekf.predict(dt)
+                x, y = ekf.x[0], ekf.x[1]
+                self.get_logger().info(f"[Prediction] Track {ekf_id}: Predicted Position: ({x:.2f}, {y:.2f})")
 
-        # 2. Remove stale EKFs
-        for robot_id, ekf in list(self.tracked_ekfs.items()):
-            if ekf and self.is_track_stale(ekf, now):
-                self.get_logger().info(f"Removing stale EKF {robot_id}")
-                self.tracked_ekfs[robot_id] = None
+        # 2. Remove stale EKFs (> 3s)
+        for ekf_id, ekf in list(self.tracked_ekfs.items()):
+            if ekf and (now - ekf.last_update_time).nanoseconds / 1e9 > 3.0:
+                self.get_logger().info(f"[Stale Removal] Removing EKF {ekf_id} after 3s timeout.")
+                
+                # Publish DELETE markers to remove visualization
+                ekf.publish_delete_markers()
+                
+                self.tracked_ekfs[ekf_id] = None
 
-        # 3. Get raw detections
+        # 3. Fetch detections
         with self.buffer_lock:
             raw_detections = list(self.detection_buffer)
             self.detection_buffer.clear()
 
         if not raw_detections:
-            self.get_logger().info("No detections this cycle.")
+            self.get_logger().info("[Detection] No detections this frame.")
             return
 
-        # 4. Debug-Ausgabe aller EKFs und ihrer Distanzen zu Messungen
-        for ekf_id, ekf in self.tracked_ekfs.items():
-            if not ekf:
-                continue
+        self.get_logger().info(f"[Detection] {len(raw_detections)} detections received.")
+        for i, (pose, sensor) in enumerate(raw_detections):
+            self.get_logger().info(f"[Detection Info] Detection {i}: Sensor={sensor}, Position=({pose.position.x:.2f}, {pose.position.y:.2f})")
 
-            x, y = ekf.x[0], ekf.x[1]
-            self.get_logger().info(f"[Track {ekf_id}] Predicted Position: ({x:.2f}, {y:.2f})")
+        # 4. Mahalanobis-Zuordnung jeder Detection zu jedem Track
+        assignment_results = []
+        for i, (pose, sensor) in enumerate(raw_detections):
+            best_distance = float('inf')
+            best_ekf_id = None
+            for ekf_id, ekf in self.tracked_ekfs.items():
+                if ekf:
+                    d = ekf.get_mahalanobis_distance(pose, sensor)
+                    if d < self.GATE_THRESHOLD_SECONDARY and d < best_distance:
+                        best_distance = d
+                        best_ekf_id = ekf_id
+                    self.get_logger().info(f"[Mahalanobis] Detection {i} to Track {ekf_id}: d² = {d:.2f}")
+            assignment_results.append((i, best_ekf_id, best_distance))
 
-            for idx, (pose, sensor) in enumerate(raw_detections):
-                d = ekf.get_mahalanobis_distance(pose, sensor)
-                px, py = pose.position.x, pose.position.y
-                self.get_logger().info(
-                    f"  ↳ Detection {idx} ({sensor}) at ({px:.2f}, {py:.2f}) → Mahalanobis-Distanz: {d:.2f}"
-                )
-
-        # 5. Update EKFs mit allen passenden Messungen
-        for ekf_id, ekf in self.tracked_ekfs.items():
-            if not ekf:
-                continue
-
-            matched_measurements = []
-            for pose, sensor in raw_detections:
-                distance = ekf.get_mahalanobis_distance(pose, sensor)
-                if distance < self.GATE_THRESHOLD:
-                    matched_measurements.append((pose, sensor))
-
-            if matched_measurements:
-                self.get_logger().info(f"Track {ekf_id}: {len(matched_measurements)} passende Messungen")
-                for pose, sensor in matched_measurements:
-                    ekf.update(pose, sensor)
-
-                x, y = ekf.x[0], ekf.x[1]
-                self.get_logger().info(f"→ Track {ekf_id} neue Position nach Update: ({x:.2f}, {y:.2f})")
-
+        # 5. Track-Update mit bester gültiger Zuweisung
+        assigned_detections = set()
+        for det_id, ekf_id, dist in assignment_results:
+            if ekf_id is not None and det_id not in assigned_detections:
+                pose, sensor = raw_detections[det_id]
+                if dist <= self.GATE_THRESHOLD_PRIMARY:
+                    self.tracked_ekfs[ekf_id].update(pose, sensor)
+                    updated_x, updated_y = self.tracked_ekfs[ekf_id].x[0], self.tracked_ekfs[ekf_id].x[1]
+                    self.get_logger().info(f"[Update] Detection {det_id} assigned to Track {ekf_id} (Primary Threshold, d²={dist:.2f}). Updated Position: ({updated_x:.2f}, {updated_y:.2f})")
+                elif dist <= self.GATE_THRESHOLD_SECONDARY:
+                    self.tracked_ekfs[ekf_id].update(pose, sensor, increased_uncertainty=True)
+                    updated_x, updated_y = self.tracked_ekfs[ekf_id].x[0], self.tracked_ekfs[ekf_id].x[1]
+                    self.get_logger().info(f"[Update] Detection {det_id} assigned to Track {ekf_id} (Secondary Threshold, d²={dist:.2f}). Updated Position: ({updated_x:.2f}, {updated_y:.2f})")
+                assigned_detections.add(det_id)
             else:
-                self.get_logger().warn(f"Track {ekf_id} hat keine passende Messung → predict only")
-                ekf.predict(dt)
+                self.get_logger().info(f"[No Update] Detection {det_id} could not be assigned.")
 
-            ekf.publish_odometry()
+        # 6. Initialisierung neuer Tracks bei freien Slots
+        for det_id, ekf_id, dist in assignment_results:
+            if det_id not in assigned_detections:
+                for slot_id, slot in self.tracked_ekfs.items():
+                    if slot is None:
+                        pose, sensor = raw_detections[det_id]
+                        self.tracked_ekfs[slot_id] = SingleEKF(pose, self, slot_id)
+                        self.get_logger().info(f"[Init] New EKF Track {slot_id} from Detection {det_id}")
+                        break
 
-        # 6. Neue EKFs initialisieren
-        unassigned_detections = []
-        for pose, sensor in raw_detections:
-            assigned = False
-            for ekf in self.tracked_ekfs.values():
-                if ekf and ekf.get_mahalanobis_distance(pose, sensor) < self.GATE_THRESHOLD:
-                    assigned = True
-                    break
-            if not assigned:
-                unassigned_detections.append((pose, sensor))
+        # 7. Publish für alle aktiven EKFs
+        for ekf_id, ekf in self.tracked_ekfs.items():
+            if ekf:
+                ekf.publish_odometry()
 
-        for i, ekf in self.tracked_ekfs.items():
-            if ekf is None and unassigned_detections:
-                pose, sensor = unassigned_detections.pop(0)
-                self.tracked_ekfs[i] = SingleEKF(pose, self, i)
-                self.get_logger().info(f"→ New EKF {i} initialized at ({pose.position.x:.2f}, {pose.position.y:.2f})")
+        self.get_logger().info("[Frame End] ------ Frame End ------\n")
 
-        self.get_logger().info("------ Frame End ------\n")
 
 def main(args=None):
     # Entry point for the EKF tracker node.
