@@ -1,7 +1,7 @@
 clear all
 
 % Symbolic variables
-syms pos_x pos_y theta v omega u1 u2 a b c d e dt real
+syms pos_x pos_y theta v omega a b c d e dt
 x = [pos_x; pos_y; theta; v; omega];
 u = [];
 

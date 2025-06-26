@@ -2,21 +2,28 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>robot_estimator</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
-  <maintainer email="lgerstla@stud.hs-heilbronn.de">lukas</maintainer>
+  <version>1.0.0</version>
+  <description>Robot estimation with Kalman Filter</description>
+  <maintainer email="lgerstla@stud.hs-heilbronn.de; jkurz1@stud.hs-heilbronn.de">lukas</maintainer>
   <license>Apache-2.0</license>
 
   <depend>rclcpp</depend>
   <depend>rclcpp_components</depend>
   <depend>std_msgs</depend>
   <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>robot_msgs</depend>
+  <depend>ament_index_python</depend>
   <depend>launch</depend>
   <depend>launch_ros</depend>
-  <depend>ament_index_python</depend>
-  <exec_depend>robot_msgs</exec_depend>
-
-
+  
+  <exec_depend>matplotlib</exec_depend>
+  <exec_depend>numpy</exec_depend>
+  <exec_depend>scipy</exec_depend>
+  <exec_depend>sklearn</exec_depend>
+  <exec_depend>random</exec_depend>
+  <exec_depend>threading</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

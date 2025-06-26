@@ -81,11 +81,19 @@ class SingleEKF:
         # Updates the EKF state using a new measurement from a sensor (camera or lidar).
         # Adds logic for increased uncertainty when using secondary threshold detections.
 
+<<<<<<< HEAD
+        # Convert measurement to vector based on sensor type
+        if sensor_type == "camera":
+            quat = [measurement.orientation.x, measurement.orientation.y,
+                    measurement.orientation.z, measurement.orientation.w]
+            yaw = R.from_quat(quat).as_euler('zyx')[0]  # Extract yaw from quaternion
+=======
         # Messung vektorisieren + passende R wählen
         if sensor_type == "camera":
             quat = [measurement.orientation.x, measurement.orientation.y,
                     measurement.orientation.z, measurement.orientation.w]
             yaw = R.from_quat(quat).as_euler('zyx')[0]
+>>>>>>> b1ae4f4faf8a6400a5c7459e37df1de845e88f30
             z_measured = np.array([measurement.position.x, measurement.position.y, yaw])
             R_mat = np.diag([0.2**2, 0.2**2, 0.05**2])  # Reduced measurement noise for camera
         elif sensor_type == "lidar":
@@ -170,6 +178,41 @@ class SingleEKF:
         # Computes the Mahalanobis distance between the predicted state and a given measurement.
         # Used for associating measurements with tracks during the assignment phase.
 
+<<<<<<< HEAD
+        # Convert measurement to vector based on sensor type
+        if sensor_type == "camera":
+            quat = [measurement.orientation.x, measurement.orientation.y,
+                    measurement.orientation.z, measurement.orientation.w]
+            yaw = R.from_quat(quat).as_euler('zyx')[0]  # Extract yaw from quaternion
+            z_measured = np.array([measurement.position.x, measurement.position.y, yaw])
+            R_mat = np.diag([0.04, 0.04, 0.0001])  # Measurement noise covariance for camera
+        elif sensor_type == "lidar":
+            z_measured = np.array([measurement.position.x, measurement.position.y])
+            R_mat = np.diag([0.04, 0.04])  # Measurement noise covariance for lidar
+        else:
+            z_measured = np.array([measurement.position.x, measurement.position.y])
+            R_mat = np.diag([0.1, 0.1])  # Default measurement noise covariance
+
+        # Predict measurement based on current state
+        z_predicted = self.h_of_x(self.x, sensor_type)
+        y = z_measured - z_predicted  # Innovation (difference between measured and predicted)
+
+        # Normalize angle if yaw is measured (camera)
+        if sensor_type == "camera" and len(y) == 3:
+            y[2] = self.normalize_angle(y[2])
+
+        # Compute Jacobian matrix of the measurement model
+        H = self.compute_H(self.x, sensor_type)
+
+        # Compute innovation covariance matrix
+        S = H @ self.P @ H.T + R_mat
+        try:
+            # Compute Mahalanobis distance
+            d2 = y.T @ np.linalg.inv(S) @ y
+            return d2
+        except np.linalg.LinAlgError:
+            # Handle numerical instability
+=======
         # Messung als Vektor
         if sensor_type == "camera":
             quat = [measurement.orientation.x, measurement.orientation.y,
@@ -198,22 +241,38 @@ class SingleEKF:
             d2 = y.T @ np.linalg.inv(S) @ y
             return d2
         except np.linalg.LinAlgError:
+>>>>>>> b1ae4f4faf8a6400a5c7459e37df1de845e88f30
             self.node.get_logger().warn(f"Singular matrix in Mahalanobis distance for EKF {self.track_id}.")
             return float('inf')
 
     def publish_odometry(self):
         # Publishes the robot's current state as an odometry message.
         # Also publishes visualization markers for the covariance ellipse and velocity arrow.
+<<<<<<< HEAD
+=======
 
         odom = Odometry()
         odom.header.stamp = self.node.get_clock().now().to_msg()
         odom.header.frame_id = 'map'
         odom.child_frame_id = f'robot_{self.track_id}/base_link'
+>>>>>>> b1ae4f4faf8a6400a5c7459e37df1de845e88f30
 
+        odom = Odometry()
+        odom.header.stamp = self.node.get_clock().now().to_msg()  # Set timestamp
+        odom.header.frame_id = 'map'  # Reference frame for the odometry
+        odom.child_frame_id = f'robot_{self.track_id}/base_link'  # Child frame for the robot
+
+        # Set position in odometry message
         odom.pose.pose.position.x = self.x[0]
         odom.pose.pose.position.y = self.x[1]
+<<<<<<< HEAD
+        odom.pose.pose.position.z = 0.0  # Z-coordinate is fixed
+
+        # Convert yaw angle to quaternion for orientation
+=======
         odom.pose.pose.position.z = 0.0
 
+>>>>>>> b1ae4f4faf8a6400a5c7459e37df1de845e88f30
         quaternion = R.from_euler('z', self.x[2]).as_quat()
         odom.pose.pose.orientation.x = quaternion[0]
         odom.pose.pose.orientation.y = quaternion[1]
