@@ -1,0 +1,117 @@
+<mxfile host="app.diagrams.net" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36" version="27.1.6">
+  <diagram name="Seite-1" id="a6F9nBDB_KjyDrOwTJSP">
+    <mxGraphModel dx="1082" dy="168" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="XjTm85ztASIsL9rDwglZ-34" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-1" target="XjTm85ztASIsL9rDwglZ-2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-1" value="Timer callback starts every 100 ms" style="rounded=1;whiteSpace=wrap;html=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-20" y="380" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-9" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-3" target="XjTm85ztASIsL9rDwglZ-8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-3" value="Remove stale EKFs &amp;gt;2s inactive" style="rounded=1;whiteSpace=wrap;html=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-20" y="540" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-31" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-8" target="XjTm85ztASIsL9rDwglZ-10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-8" value="Retrieve raw detections from buffer" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-20" y="620" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-13" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-10" target="XjTm85ztASIsL9rDwglZ-12">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="130" y="750" />
+              <mxPoint x="130" y="370" />
+              <mxPoint x="220" y="370" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-32" value="Yes" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontColor=light-dark(#000000,#000000);" vertex="1" connectable="0" parent="XjTm85ztASIsL9rDwglZ-13">
+          <mxGeometry x="-0.0421" relative="1" as="geometry">
+            <mxPoint x="-30" y="214" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-30" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-10" target="XjTm85ztASIsL9rDwglZ-1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="-50" y="750" />
+              <mxPoint x="-50" y="360" />
+              <mxPoint x="40" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-33" value="No" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];labelBackgroundColor=none;fontColor=light-dark(#000000,#000000);" vertex="1" connectable="0" parent="XjTm85ztASIsL9rDwglZ-30">
+          <mxGeometry x="-0.8939" relative="1" as="geometry">
+            <mxPoint x="9" y="10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-10" value="Detections available?" style="rhombus;whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry y="710" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-15" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-12" target="XjTm85ztASIsL9rDwglZ-14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-12" value="Calculate Mahalanobis distances" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="380" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-17" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-14" target="XjTm85ztASIsL9rDwglZ-16">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-14" value="Best assignment of each detection to EKFs" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="460" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-19" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-16" target="XjTm85ztASIsL9rDwglZ-18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-16" value="Primary update:&amp;nbsp;&lt;div&gt;d² &amp;lt; 20 → normal uncertainty&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="540" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-21" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-18" target="XjTm85ztASIsL9rDwglZ-20">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-18" value="Secondary update:&amp;nbsp;&lt;div&gt;d² &amp;lt; 100 → increased uncertainty&lt;/div&gt;" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="620" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-23" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-20" target="XjTm85ztASIsL9rDwglZ-22">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="380" y="770.0000000000009" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-20" value="Unassigned detections → new EKFs if available" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="700" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-22" target="XjTm85ztASIsL9rDwglZ-1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="190" y="1240.0000000000005" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="220" y="860" />
+              <mxPoint x="-50" y="860" />
+              <mxPoint x="-50" y="360" />
+              <mxPoint x="40" y="360" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-22" value="Publish EKF odometry &amp;amp; markers" style="whiteSpace=wrap;html=1;rounded=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="160" y="780" width="120" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-27" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=0;exitDx=0;exitDy=0;exitPerimeter=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-24" target="XjTm85ztASIsL9rDwglZ-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-24" value="Start" style="strokeWidth=2;html=1;shape=mxgraph.flowchart.start_2;whiteSpace=wrap;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-10" y="290" width="100" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;curved=0;strokeColor=light-dark(#000000,#000000);" edge="1" parent="1" source="XjTm85ztASIsL9rDwglZ-2" target="XjTm85ztASIsL9rDwglZ-3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="XjTm85ztASIsL9rDwglZ-2" value="Prediction of all active EKFs" style="rounded=1;whiteSpace=wrap;html=1;flipV=1;fillColor=light-dark(#1ba1e2, #002896);fontColor=light-dark(#FFFFFF,#FFFFFF);strokeColor=none;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="-20" y="460" width="120" height="60" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
