@@ -16,7 +16,7 @@ class RobotControllerNode(Node):
 
         self.robot_pub = self.create_publisher(PoseArray, '/robots/pose', 10)
         self.create_timer(0.1, self.update_positions)
-        self.create_timer(3.0, self.change_directions)  # Timer to change directions every 3 seconds
+        self.create_timer(10.0, self.change_directions)  # Timer to change directions every 3 seconds
 
         # Initialize robot positions and directions
         self.robots = []
