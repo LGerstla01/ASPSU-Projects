@@ -16,7 +16,7 @@ class RobotControllerNode(Node):
 
         self.robot_pub = self.create_publisher(PoseArray, '/robots/pose', 10)
         self.create_timer(0.1, self.update_positions)
-        self.create_timer(3.0, self.change_directions)  # Timer to change directions every 3 seconds
+        self.create_timer(10.0, self.change_directions)  # Timer to change directions every 3 seconds
 
         # Initialize robot positions and directions
         self.robots = []
@@ -36,7 +36,7 @@ class RobotControllerNode(Node):
             robot['angle'] += random.uniform(-0.2, 0.2)  # Kleine zufällige Änderung pro Schritt
 
             # Update position
-            robot['x'] += math.cos(robot['angle']) * 0.3  # Move forward (0.5 units per step)
+            robot['x'] += math.cos(robot['angle']) * 0.3 
             robot['y'] += math.sin(robot['angle']) * 0.3
 
             # Check for collisions with walls and bounce
